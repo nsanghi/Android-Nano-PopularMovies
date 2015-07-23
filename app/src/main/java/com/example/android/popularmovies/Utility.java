@@ -18,4 +18,9 @@ public class Utility {
         return prefs.getString(context.getString(R.string.pref_sort_key),
                 context.getString(R.string.pref_sort_most_popular));
     }
+
+    public static boolean isFavoriteOption(Context context) {
+        return Utility.getPreferredSortBy(context).equals(context.getString(R.string
+                .pref_sort_favorite));
+    }
 }

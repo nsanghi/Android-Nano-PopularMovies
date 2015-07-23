@@ -1,20 +1,28 @@
 package com.example.android.popularmovies;
 
 import android.content.ActivityNotFoundException;
+import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.example.android.popularmovies.data.Movie;
+import com.example.android.popularmovies.data.MovieContract;
 import com.example.android.popularmovies.data.Review;
 import com.squareup.picasso.Picasso;
 
@@ -32,11 +40,19 @@ import java.util.ArrayList;
 /**
  * A placeholder fragment containing a simple view.
  */
-public class MovieDetailFragment extends Fragment {
+public class MovieDetailFragment extends Fragment implements LoaderManager
+        .LoaderCallbacks<Cursor> {
     public static final String LOG_TAG = MovieDetailFragment.class.getSimpleName();
     public static final String EXTRA_MOVIE_RUNLENGTH = "EXTRA_MOVIE_RUNLENGTH";
     public static final String EXTRA_TRAILERS = "EXTRA_TRAILERS";
     public static final String EXTRA_REVIEWS = "EXTRA_REVIEW";
+
+    public static final int MOVIE_LOADER = 0;
+    public static final int TRAILER_LOADER = 1;
+    public static final int REVIEW_LOADER = 2;
+    public static final int MOVIE_INSERT = 3;
+    public static final int TRAILER_INSERT = 4;
+    public static final int REVIEW_INSERT = 5;
 
     private TextView mTitle;
     private ImageView mMovieImage;
@@ -47,6 +63,10 @@ public class MovieDetailFragment extends Fragment {
     private View mRootView;
     private ArrayList<String> mTrailers;
     private ArrayList<Review> mReviews;
+    private Button mButtom;
+    private long movieRowId;
+    private String mMovieCode;
+    private String mMovieImagePath;
 
 
     public MovieDetailFragment() {
@@ -59,45 +79,136 @@ public class MovieDetailFragment extends Fragment {
 
         mTrailers = new ArrayList<String>();
         mReviews = new ArrayList<Review>();
+        mTitle = (TextView) mRootView.findViewById(R.id.orignal_title);
+        mMovieImage = (ImageView) mRootView.findViewById(R.id.movie_image);
+        mReleaseDate = (TextView) mRootView.findViewById(R.id.release_date);
+        mRating = (TextView) mRootView.findViewById(R.id.user_rating);
+        mOverview = (TextView) mRootView.findViewById(R.id.overview);
+        mRuntime = (TextView) mRootView.findViewById(R.id.runtime);
+        mButtom = (Button) mRootView.findViewById(R.id.favorite_button);
+
 
         Intent intent = getActivity().getIntent();
 
-        if (intent != null && intent.hasExtra(MoviesFragment.EXTRA_MOVIE)) {
-            Movie movie = intent.getParcelableExtra(MoviesFragment.EXTRA_MOVIE);
-            mTitle = (TextView) mRootView.findViewById(R.id.orignal_title);
-            mMovieImage = (ImageView) mRootView.findViewById(R.id.movie_image);
-            mReleaseDate = (TextView) mRootView.findViewById(R.id.release_date);
-            mRating = (TextView) mRootView.findViewById(R.id.user_rating);
-            mOverview = (TextView) mRootView.findViewById(R.id.overview);
-            mRuntime = (TextView) mRootView.findViewById(R.id.runtime);
+        if (Utility.isFavoriteOption(getActivity())) {
+            movieRowId = ContentUris.parseId(intent.getData());
+            Log.d(LOG_TAG, "movieRowId form Uri: " + movieRowId);
+            //load from cursor
+        } else {
+            if (intent != null && intent.hasExtra(MoviesFragment.EXTRA_MOVIE)) {
+                Movie movie = intent.getParcelableExtra(MoviesFragment.EXTRA_MOVIE);
 
-            mTitle.setText(movie.getOriginalTitle());
-            mReleaseDate.setText(movie.getReleaseDate().substring(0, 4));
-            mRating.setText(movie.getRating() + "/10");
-            mOverview.setText(movie.getOverview());
-            Picasso.with(getActivity()).load(movie.getPosterPath()).into(mMovieImage);
-            if (savedInstanceState == null) {
-                FetchMovieDetailsTask movieTask = new FetchMovieDetailsTask();
-                movieTask.execute(movie.getId());
-                FetchTrailersTask trailersTask = new FetchTrailersTask();
-                trailersTask.execute(movie.getId());
-                FetchReviewsTask reviewsTask = new FetchReviewsTask();
-                reviewsTask.execute(movie.getId());
+                mTitle.setText(movie.getOriginalTitle());
+                mReleaseDate.setText(movie.getReleaseDate().substring(0, 4));
+                mRating.setText(movie.getRating() + "/10");
+                mOverview.setText(movie.getOverview());
+                Picasso.with(getActivity()).load(movie.getPosterPath()).into(mMovieImage);
+                mMovieImagePath = movie.getPosterPath();
+                mMovieCode = movie.getId();
+                if (savedInstanceState == null) {
+                    FetchMovieDetailsTask movieTask = new FetchMovieDetailsTask();
+                    movieTask.execute(movie.getId());
+                    FetchTrailersTask trailersTask = new FetchTrailersTask();
+                    trailersTask.execute(movie.getId());
+                    FetchReviewsTask reviewsTask = new FetchReviewsTask();
+                    reviewsTask.execute(movie.getId());
+                } else {
+                    mRuntime.setText(savedInstanceState.getString(EXTRA_MOVIE_RUNLENGTH));
+                    mTrailers = savedInstanceState.getStringArrayList(EXTRA_TRAILERS);
+                    mReviews = savedInstanceState.getParcelableArrayList(EXTRA_REVIEWS);
+                    populateTrailers();
+                    populateReviews();
+                }
+
+                mButtom.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        saveFavoriteMovieData();
+                    }
+                });
             } else {
-                mRuntime.setText(savedInstanceState.getString(EXTRA_MOVIE_RUNLENGTH));
-                mTrailers = savedInstanceState.getStringArrayList(EXTRA_TRAILERS);
-                mReviews = savedInstanceState.getParcelableArrayList(EXTRA_REVIEWS);
-                populateTrailers();
-                populateReviews();
+                Log.d(LOG_TAG, "Detail activity started without a reference to a movie object");
             }
 
-        } else {
-            Log.d(LOG_TAG, "Detail activity started without a reference to a movie object");
+
         }
 
 
         return mRootView;
     }
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        if (Utility.isFavoriteOption(getActivity())) {
+            Log.d(LOG_TAG, "Calling Loader for Movie");
+            getLoaderManager().initLoader(MOVIE_LOADER, null, this);
+            Log.d(LOG_TAG, "Calling Loader for Trailer");
+            getLoaderManager().initLoader(TRAILER_LOADER, null, this);
+            Log.d(LOG_TAG, "Calling Loader for Review");
+            getLoaderManager().initLoader(REVIEW_LOADER, null, this);
+        }
+        super.onActivityCreated(savedInstanceState);
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        if (!Utility.isFavoriteOption(getActivity())) {
+            outState.putString(EXTRA_MOVIE_RUNLENGTH, mRuntime.getText().toString());
+            outState.putStringArrayList(EXTRA_TRAILERS, mTrailers);
+            outState.putParcelableArrayList(EXTRA_REVIEWS, mReviews);
+        }
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+    }
+
+    private void saveFavoriteMovieData() {
+
+        Uri returnUri;
+
+        ContentValues movieValues = new ContentValues();
+        movieValues.put(MovieContract.MovieEntry.COLUMN_MOVIE_CODE, mMovieCode);
+        movieValues.put(MovieContract.MovieEntry.COLUMN_OVERVIEW, mOverview.getText().toString());
+        movieValues.put(MovieContract.MovieEntry.COLUMN_POSTER_PATH, mMovieImagePath);
+        movieValues.put(MovieContract.MovieEntry.COLUMN_RELEASE_DATE, mReleaseDate.getText()
+                .toString());
+        movieValues.put(MovieContract.MovieEntry.COLUMN_TITLE, mTitle.getText().toString());
+        movieValues.put(MovieContract.MovieEntry.COLUMN_RATING, mRating.getText().toString());
+        movieValues.put(MovieContract.MovieEntry.COLUMN_RUNTIME, mRuntime.getText().toString());
+        returnUri = getActivity().getContentResolver().insert(MovieContract.MovieEntry.CONTENT_URI,
+                movieValues);
+        Log.d(LOG_TAG, "insert into Movie returned with Uri: " + returnUri);
+        movieRowId = ContentUris.parseId(returnUri);
+
+        ContentValues values;
+        for (String youtubeUrl : mTrailers) {
+            values = new ContentValues();
+            values.put(MovieContract.TrailerEntry.COLUMN_YOUTUBE_URL, youtubeUrl);
+            values.put(MovieContract.TrailerEntry.COLUMN_MOVIE_ID, movieRowId);
+            returnUri = getActivity().getContentResolver().insert(MovieContract.TrailerEntry
+                            .CONTENT_URI,
+                    values);
+            Log.d(LOG_TAG, "insert into Trailer returned with Uri: " + returnUri);
+
+        }
+
+        for (Review review : mReviews) {
+            values = new ContentValues();
+            values.put(MovieContract.ReviewEntry.COLUMN_REVIEWER_NAME, review.getAutoher());
+            values.put(MovieContract.ReviewEntry.COLUMN_REVIEWER_COMMENT, review.getComment());
+            values.put(MovieContract.ReviewEntry.COLUMN_MOVIE_ID, movieRowId);
+            returnUri = getActivity().getContentResolver().insert(MovieContract.ReviewEntry
+                            .CONTENT_URI, values);
+            Log.d(LOG_TAG, "insert into Review returned with Uri: " + returnUri);
+
+        }
+
+        mButtom.setText(getString(R.string.marked_favorite));
+    }
+
 
     private void populateTrailers() {
         LinearLayout trailersLayout = (LinearLayout) mRootView.findViewById(R.id.trailer_list);
@@ -110,13 +221,16 @@ public class MovieDetailFragment extends Fragment {
             trailersLayout.addView(view);
             TextView textView = (TextView) view.findViewById(R.id.trailer_link);
             textView.setText("Trailer " + (i + 1));
+
             textView.setOnClickListener(new View.OnClickListener() {
                 @Override
 
-                //idea borrowed from http://stackoverflow.com/questions/574195/android-youtube-app-play-video-intent
+                //idea borrowed from http://stackoverflow
+                // .com/questions/574195/android-youtube-app-play-video-intent
                 public void onClick(View v) {
                     try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:" +
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("vnd" +
+                                ".youtube:" +
                                 id));
                         startActivity(intent);
                     } catch (ActivityNotFoundException ex) {
@@ -127,6 +241,7 @@ public class MovieDetailFragment extends Fragment {
                 }
             });
         }
+
     }
 
     private void populateReviews() {
@@ -145,11 +260,108 @@ public class MovieDetailFragment extends Fragment {
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
-        outState.putString(EXTRA_MOVIE_RUNLENGTH, mRuntime.getText().toString());
-        outState.putStringArrayList(EXTRA_TRAILERS, mTrailers);
-        outState.putParcelableArrayList(EXTRA_REVIEWS, mReviews);
-        super.onSaveInstanceState(outState);
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        Log.d(LOG_TAG, "called onCreateLoader for loader id: " + id);
+        switch (id) {
+            case MOVIE_LOADER: {
+                Uri uri = MovieContract.MovieEntry.buildMovieUri(movieRowId);
+                return new CursorLoader(
+                        getActivity(),
+                        uri,
+                        null,
+                        null,
+                        null,
+                        null
+                );
+            }
+            case REVIEW_LOADER: {
+                Uri uri = MovieContract.ReviewEntry.buildReviewMovie(movieRowId);
+                return new CursorLoader(
+                        getActivity(),
+                        uri,
+                        null,
+                        null,
+                        null,
+                        null
+                );
+            }
+            case TRAILER_LOADER: {
+                Uri uri = MovieContract.TrailerEntry.buildTrailerMovie(movieRowId);
+                return new CursorLoader(
+                        getActivity(),
+                        uri,
+                        null,
+                        null,
+                        null,
+                        null
+                );
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        Log.d(LOG_TAG, "called onLoadFinished for loader id: " + loader.getId());
+        switch (loader.getId()) {
+            case MOVIE_LOADER: {
+                if (data != null && data.moveToFirst()) {
+                    mTitle.setText(data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_TITLE)));
+                    mReleaseDate.setText(data.getString(data.getColumnIndex(MovieContract
+                            .MovieEntry.COLUMN_RELEASE_DATE)));
+                    mRating.setText(data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_RATING)));
+                    mOverview.setText(data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_OVERVIEW)));
+                    Picasso.with(getActivity())
+                            .load(data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                                    .COLUMN_POSTER_PATH)))
+                            .into(mMovieImage);
+                    mRuntime.setText(data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_RUNTIME)));
+                    mMovieCode = data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_MOVIE_CODE));
+                    mMovieImagePath = data.getString(data.getColumnIndex(MovieContract.MovieEntry
+                            .COLUMN_POSTER_PATH));
+                    mButtom.setText(getString(R.string.marked_favorite));
+                }
+                break;
+            }
+            case TRAILER_LOADER: {
+                if (data != null) {
+                    Log.d(LOG_TAG, "Trailer rows retured: " + data.getCount());
+                    while (data.moveToNext()) {
+                        mTrailers.add(data.getString(data.getColumnIndex(MovieContract.TrailerEntry
+                                .COLUMN_YOUTUBE_URL)));
+                    }
+                }
+                populateTrailers();
+                break;
+            }
+            case REVIEW_LOADER: {
+                if (data != null) {
+                    Log.d(LOG_TAG, "Review rows retured: " + data.getCount());
+                    String author;
+                    String comment;
+                    while (data.moveToNext()) {
+                        author = data.getString(data.getColumnIndex(MovieContract.ReviewEntry
+                                .COLUMN_REVIEWER_NAME));
+                        comment = data.getString(data.getColumnIndex(MovieContract
+                                .ReviewEntry.COLUMN_REVIEWER_COMMENT));
+                        mReviews.add(new Review(author, comment));
+                    }
+                }
+                populateReviews();
+                break;
+            }
+        }
+
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+
     }
 
     public class FetchMovieDetailsTask extends AsyncTask<String, Void, String> {
@@ -301,7 +513,7 @@ public class MovieDetailFragment extends Fragment {
         private final String MDB_REVIEW_PATH = "reviews";
         private final String MDB_REVIEWS_LIST = "results";
         private final String MDB_REVIEW_AUTHOR = "author";
-        private final String MDB_REVIEW_CONTENT  = "content";
+        private final String MDB_REVIEW_CONTENT = "content";
 
         @Override
         protected ArrayList<Review> doInBackground(String... params) {

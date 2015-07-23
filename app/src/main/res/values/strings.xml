@@ -6,11 +6,14 @@
     <string name="pref_sort_label">Sort By</string>
     <string name="pref_sort_label_most_popular">Most Popular</string>
     <string name="pref_sort_label_highest_rated">Highest Rated</string>
+    <string name="pref_sort_label_favorite">Favorite</string>
     <string name="pref_sort_most_popular">mostpopular</string>
     <string name="pref_sort_highest_rated">highestrated</string>
+    <string name="pref_sort_favorite">favorite</string>
     <string name="title_activity_movie_detail">Movie Detail</string>
     <string name="hello_world">Hello world!</string>
     <string name="mark_favorite">MARK AS \nFAVORITE</string>
+    <string name="marked_favorite">MARKED AS \nFAVORITE</string>
 
     <!--
     -->
