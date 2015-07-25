@@ -33,6 +33,7 @@ public class MovieDbHelper extends SQLiteOpenHelper {
                 MovieEntry.COLUMN_OVERVIEW + " TEXT NOT NULL " +
                 " );";
 
+        //create table to hold trailers
         final String SQL_CREATE_TRAILER_TABLE = "CREATE TABLE " +TrailerEntry.TABLE_NAME + " (" +
                 TrailerEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 TrailerEntry.COLUMN_YOUTUBE_URL + " TEXT NOT NULL, " +
@@ -42,6 +43,7 @@ public class MovieDbHelper extends SQLiteOpenHelper {
                 " UNIQUE (" + TrailerEntry.COLUMN_MOVIE_ID + ", " +
                 TrailerEntry.COLUMN_YOUTUBE_URL +") ON CONFLICT REPLACE);";
 
+        //create table to hold reviews
         final String SQL_CREATE_REVIEW_TABLE = "CREATE TABLE " +ReviewEntry.TABLE_NAME + " (" +
                 ReviewEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 ReviewEntry.COLUMN_REVIEWER_NAME + " TEXT NOT NULL, " +

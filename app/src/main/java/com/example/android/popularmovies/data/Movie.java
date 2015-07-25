@@ -8,7 +8,7 @@ import android.os.Parcelable;
  */
 public class Movie implements Parcelable {
 
-    private String id;
+    private String id; //not the curosr Id, but the IMDB movieId (or code)
     private String posterPath;
     private String originalTitle;
     private String overview;
@@ -79,18 +79,6 @@ public class Movie implements Parcelable {
         this.overview = in.readString();
         this.rating = in.readString();
         this.releaseDate = in.readString();
-//        try {
-//            String[] data = new String[6];
-//            in.readStringArray(data);
-//            this.id = data[0];
-//            this.posterPath = data[1];
-//            this.originalTitle = data[2];
-//            this.overview = data[3];
-//            this.rating = data[4];
-//            this.releaseDate = data[5];
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
     }
 
     @Override

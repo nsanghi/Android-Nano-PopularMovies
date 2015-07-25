@@ -12,6 +12,7 @@
     <string name="pref_sort_favorite">favorite</string>
     <string name="title_activity_movie_detail">Movie Detail</string>
     <string name="hello_world">Hello world!</string>
+    <string name="action_share">Share</string>
     <string name="mark_favorite">MARK AS \nFAVORITE</string>
     <string name="marked_favorite">MARKED AS \nFAVORITE</string>
 

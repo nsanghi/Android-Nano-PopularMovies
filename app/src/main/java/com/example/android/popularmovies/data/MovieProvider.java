@@ -237,6 +237,7 @@ public class MovieProvider extends ContentProvider {
     }
 
     @Override
+    //may use it in a later pass to unfavorite a movie based on user action
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
         final int match = sUriMatcher.match(uri);
@@ -268,8 +269,10 @@ public class MovieProvider extends ContentProvider {
     }
 
     @Override
+    //NO plan to support this for now. But in future, we may need this or can be substituted by
+    //delete and insert. The idea is to how to keep the database stored movie details (overview,
+    // rating, trailers etc) current as time progresses.
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        //NO plan to support this
         return 0;
     }
 }

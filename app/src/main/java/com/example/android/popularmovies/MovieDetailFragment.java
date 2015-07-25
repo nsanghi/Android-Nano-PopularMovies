@@ -1,5 +1,7 @@
 package com.example.android.popularmovies;
 
+
+import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -12,8 +14,13 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
+import android.support.v4.view.MenuItemCompat;
+import android.support.v7.widget.ShareActionProvider;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -36,7 +43,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 
-
 /**
  * A placeholder fragment containing a simple view.
  */
@@ -50,9 +56,8 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     public static final int MOVIE_LOADER = 0;
     public static final int TRAILER_LOADER = 1;
     public static final int REVIEW_LOADER = 2;
-    public static final int MOVIE_INSERT = 3;
-    public static final int TRAILER_INSERT = 4;
-    public static final int REVIEW_INSERT = 5;
+
+    static final String DETAIL_URI = "URI";
 
     private TextView mTitle;
     private ImageView mMovieImage;
@@ -61,15 +66,20 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     private TextView mOverview;
     private TextView mRuntime;
     private View mRootView;
+    private Button mButtom;
     private ArrayList<String> mTrailers;
     private ArrayList<Review> mReviews;
-    private Button mButtom;
     private long movieRowId;
     private String mMovieCode;
     private String mMovieImagePath;
+    private Activity mActivity;
+
+
+    private ShareActionProvider mShareActionProvider;
 
 
     public MovieDetailFragment() {
+        setHasOptionsMenu(true);
     }
 
     @Override
@@ -87,17 +97,18 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         mRuntime = (TextView) mRootView.findViewById(R.id.runtime);
         mButtom = (Button) mRootView.findViewById(R.id.favorite_button);
 
+        Bundle args = getArguments();
+        if (args!=null) {
+            Uri uri = args.getParcelable(MovieDetailFragment.DETAIL_URI);
+            Movie movie = args.getParcelable(MoviesFragment.EXTRA_MOVIE);
 
-        Intent intent = getActivity().getIntent();
-
-        if (Utility.isFavoriteOption(getActivity())) {
-            movieRowId = ContentUris.parseId(intent.getData());
-            Log.d(LOG_TAG, "movieRowId form Uri: " + movieRowId);
-            //load from cursor
-        } else {
-            if (intent != null && intent.hasExtra(MoviesFragment.EXTRA_MOVIE)) {
-                Movie movie = intent.getParcelableExtra(MoviesFragment.EXTRA_MOVIE);
-
+            if (uri != null) {
+                //load from cursor using the cursor row id stored in movieRowId. Loading will be
+                // done in onActivityCreated() method
+                movieRowId = ContentUris.parseId(uri);
+                Log.d(LOG_TAG, "movieRowId form Uri: " + movieRowId);
+            } else if (movie != null) {
+                //the movie to be loaded is not persisted in DB and needs to be loaded by api call
                 mTitle.setText(movie.getOriginalTitle());
                 mReleaseDate.setText(movie.getReleaseDate().substring(0, 4));
                 mRating.setText(movie.getRating() + "/10");
@@ -123,22 +134,36 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                 mButtom.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        //persist the data in database when button is clicked.
+                        //this button listener will be attached only when sort option is not
+                        // "Favorite"
                         saveFavoriteMovieData();
                     }
                 });
             } else {
-                Log.d(LOG_TAG, "Detail activity started without a reference to a movie object");
+                //shotcut method to hide the static text in detials fragment when there is no movie
+                //to be loaded
+                mRootView.setVisibility(View.INVISIBLE);
+                Log.d(LOG_TAG, "Detail activity started without a reference to a movie object or " +
+                        "an URI");
             }
 
-
+        } else {
+            //shotcut method to hide the static text in detials fragment when there is no movie
+            //to be loaded
+            mRootView.setVisibility(View.INVISIBLE);
+            Log.d(LOG_TAG, "Started with null Arguments");
         }
-
 
         return mRootView;
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
+        //when movie data needs to come from db. Use cursorloader to load
+        //all three table data - movie, trailer, review, for a given
+        //movie row Id
+        mActivity = getActivity();
         if (Utility.isFavoriteOption(getActivity())) {
             Log.d(LOG_TAG, "Calling Loader for Movie");
             getLoaderManager().initLoader(MOVIE_LOADER, null, this);
@@ -153,6 +178,14 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     @Override
     public void onSaveInstanceState(Bundle outState) {
         if (!Utility.isFavoriteOption(getActivity())) {
+            //to keep footprint small, movie data is not persisted as it will be available
+            //in the Intent that started this activity. This is true for situation when sort option
+            //is mostPopular or highest
+            //run length of movie is stored as movie length is not part of api result from search
+            //to get movie length, an api call is made with specific movie id (imdb movie id)
+            // for sort option of Favorite, loaded data is not persisted at all. Instead, movie and
+            //trailer/review are loaded from cursor using the uri that was passed on start.
+
             outState.putString(EXTRA_MOVIE_RUNLENGTH, mRuntime.getText().toString());
             outState.putStringArrayList(EXTRA_TRAILERS, mTrailers);
             outState.putParcelableArrayList(EXTRA_REVIEWS, mReviews);
@@ -163,6 +196,31 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     @Override
     public void onResume() {
         super.onResume();
+    }
+
+    public void onSortOptionChanged() {
+        //whenever sort setting is changed, new data is loaded from api or cursor. Accordingly,
+        //Details fragment's rootview is hidden to avoid seeing static text
+        mRootView.setVisibility(View.INVISIBLE);
+    }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_movie_detail, menu);
+        MenuItem menuItem = menu.findItem(R.id.action_share);
+        mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
+    }
+
+    private Intent createShareForecastIntent() {
+        if (mTrailers != null && mTrailers.size() >0) {
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "http://www.youtube.com/watch?v=" + mTrailers.get(0));
+
+            return shareIntent;
+        }
+        return null;
     }
 
     private void saveFavoriteMovieData() {
@@ -205,16 +263,21 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
             Log.d(LOG_TAG, "insert into Review returned with Uri: " + returnUri);
 
         }
-
+        //update the button to make sure that same data is not saved again and visual clue to the
+        //user to tell that the request to save data has been processed
+        //though technically till now only the request to persist the data has just been handed
+        //over to ContentResolver
         mButtom.setText(getString(R.string.marked_favorite));
     }
 
 
+    //conveninece method to take a collection of trailer URLs (as stored in memeber variable) and
+    // paint the UI with associated play action
     private void populateTrailers() {
         LinearLayout trailersLayout = (LinearLayout) mRootView.findViewById(R.id.trailer_list);
         trailersLayout.removeAllViews();
 
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
+        LayoutInflater inflater = LayoutInflater.from(mActivity);
         for (int i = 0; i < mTrailers.size(); i++) {
             final String id = mTrailers.get(i);
             View view = inflater.inflate(R.layout.trailer_item, null);
@@ -241,14 +304,18 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                 }
             });
         }
-
+        if (mShareActionProvider != null) {
+            mShareActionProvider.setShareIntent(createShareForecastIntent());
+        }
     }
 
+    //conveninece method to take a collection of reviews (stored as memeber variable) and paint the
+    // UI with associated play action
     private void populateReviews() {
         LinearLayout reviewsLayout = (LinearLayout) mRootView.findViewById(R.id.review_list);
         reviewsLayout.removeAllViews();
 
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
+        LayoutInflater inflater = LayoutInflater.from(mActivity);
         for (Review r : mReviews) {
             View view = inflater.inflate(R.layout.review_item, null);
             reviewsLayout.addView(view);
@@ -300,6 +367,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         return null;
     }
 
+    // to populate UI once Favorite movie data has been loaded through Cursor
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         Log.d(LOG_TAG, "called onLoadFinished for loader id: " + loader.getId());
@@ -364,6 +432,9 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
 
     }
 
+    // Async Task to get Movie details. Strictly speaking, this is required only to get
+    //Movie run time. Rest of the data is already available through cursor or movie object in the
+    //intent
     public class FetchMovieDetailsTask extends AsyncTask<String, Void, String> {
 
         private final String LOG_TAG = FetchMovieDetailsTask.class.getSimpleName();
@@ -426,6 +497,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         }
     }
 
+    //to lead Trailer data for a given move id (imdb movie id)
     public class FetchTrailersTask extends AsyncTask<String, Void, ArrayList<String>> {
 
         private final String LOG_TAG = FetchTrailersTask.class.getSimpleName();
@@ -506,6 +578,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     }
 
 
+    //Async Task to make API call to get Review details for a given movie id
     public class FetchReviewsTask extends AsyncTask<String, Void, ArrayList<Review>> {
 
         private final String LOG_TAG = FetchReviewsTask.class.getSimpleName();

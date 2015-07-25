@@ -1,6 +1,5 @@
 package com.example.android.popularmovies;
 
-import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -15,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.GridView;
+import android.widget.ListView;
 
 import com.example.android.popularmovies.data.Movie;
 import com.example.android.popularmovies.data.MovieContract;
@@ -34,10 +34,19 @@ import java.util.List;
 
 
 public class MoviesFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
-    private static final String LOG_TAG = MoviesFragment.class.getSimpleName();
+
+    public interface Callback {
+        public void onItemSelected(boolean isFavorite, Uri cursorUri, Movie movie);
+    }
+
+
+
+   private static final String LOG_TAG = MoviesFragment.class.getSimpleName();
     private static final String EXTRA_MOVIELIST = "com.example.android.popularmovies.movies";
     static final String EXTRA_MOVIE = "movie";
     public static final int MOVIE_LOADER = 0;
+    private static final String SELECTED_KEY = "selected_position";
+    private int mPosition = GridView.INVALID_POSITION;
 
     private MovieArrayAdapter mMovieArrayAdapter;
     private MovieCursorAdapter mMovieCursorAdapter;
@@ -53,11 +62,6 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
         setHasOptionsMenu(true);
     }
 
-
-//    private boolean isFavoriteOption() {
-//        return mCurrentSortPref.equals(getString(R.string.pref_sort_favorite));
-//    }
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -67,13 +71,22 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
         mMovieArrayAdapter = new MovieArrayAdapter(getActivity(),R.layout.list_item_movie,adapterData);
         mGridView = (GridView) rootView.findViewById(R.id.listview_movie);
         mMovieCursorAdapter = new MovieCursorAdapter(getActivity(),null,0);
+
+        if (savedInstanceState != null && savedInstanceState.containsKey(SELECTED_KEY)) {
+            mPosition = savedInstanceState.getInt(SELECTED_KEY);
+        }
+
         if (Utility.isFavoriteOption(getActivity())) {
             mGridView.setAdapter(mMovieCursorAdapter);
         } else {
-            if (savedInstanceState == null || !savedInstanceState.containsKey(EXTRA_MOVIELIST)) {
-                updateMovieList();
-            } else {
+            if (savedInstanceState != null && savedInstanceState.containsKey(EXTRA_MOVIELIST)) {
+                Log.d(LOG_TAG, "loading mvoie data from savedInstanceState");
                 adapterData = savedInstanceState.getParcelableArrayList(EXTRA_MOVIELIST);
+                mMovieArrayAdapter.clear();
+                mMovieArrayAdapter.addAll(adapterData);
+                if (mPosition != GridView.INVALID_POSITION) {
+                    mGridView.smoothScrollToPosition(mPosition);
+                }
             }
             mGridView.setAdapter(mMovieArrayAdapter);
         }
@@ -81,20 +94,19 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
         mGridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Intent intent = new Intent(getActivity(), MovieDetail.class);
                 if (Utility.isFavoriteOption(getActivity())) {
                     Cursor cursor = (Cursor) parent.getItemAtPosition(position);
                     long _id = cursor.getLong(cursor.getColumnIndexOrThrow(MovieContract
                             .MovieEntry._ID));
-                    if (cursor!=null) {
-                        intent.setData(MovieContract.MovieEntry.buildMovieUri(_id));
-                        startActivity(intent);
+                    if (cursor != null) {
+                        Uri uri = MovieContract.MovieEntry.buildMovieUri(_id);
+                        ((Callback) getActivity()).onItemSelected(true, uri, null);
                     }
                 } else {
                     Movie movie = mMovieArrayAdapter.getItem(position);
-                    intent.putExtra(EXTRA_MOVIE, movie);
-                    startActivity(intent);
+                    ((Callback) getActivity()).onItemSelected(false, null, movie);
                 }
+                mPosition = position;
             }
         });
 
@@ -104,15 +116,17 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         if (Utility.isFavoriteOption(getActivity())) {
-            getLoaderManager().initLoader(MOVIE_LOADER,null, this);
+            getLoaderManager().initLoader(MOVIE_LOADER, null, this);
+        } else {
+            if (savedInstanceState == null || !savedInstanceState.containsKey(EXTRA_MOVIELIST)) {
+                updateMovieList();
+            }
         }
         super.onActivityCreated(savedInstanceState);
     }
 
     void updateMovieList(){
-        if (mCurrentSortPref.equals(getString(R.string.pref_sort_favorite))) {
-
-        } else {
+        if (!mCurrentSortPref.equals(getString(R.string.pref_sort_favorite))) {
             FetchMoviesTask task = new FetchMoviesTask();
             task.execute(mCurrentSortPref);
         }
@@ -121,12 +135,15 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
+        Log.d(LOG_TAG, "calling onSaveInstanceState of MoviesFragment");
         outState.putParcelableArrayList(EXTRA_MOVIELIST,(ArrayList)mMovieArrayAdapter.getMovies());
+
+        if (mPosition != ListView.INVALID_POSITION) {
+            outState.putInt(SELECTED_KEY, mPosition);
+        }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
+    public void onSortOptionChanged() {
         String newSortPref = Utility.getPreferredSortBy(getActivity());
         Log.v(LOG_TAG, "Old Pref:"+ mCurrentSortPref);
         Log.v(LOG_TAG, "New Pref:" + newSortPref);
@@ -137,6 +154,11 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
                 updateMovieList();
             }
         }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
         if (Utility.isFavoriteOption(getActivity())) {
             mGridView.setAdapter(mMovieCursorAdapter);
             getLoaderManager().restartLoader(MOVIE_LOADER, null, this);
@@ -150,12 +172,15 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
                 null,null,null,null);
     }
 
+    // to process the data obtained from db when sort setting is favorite
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         mMovieCursorAdapter.swapCursor(data);
 
     }
 
+    // to make api call and process the data for "discover" api - used when sort setting is
+    // popular or mostRated
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
         mMovieCursorAdapter.swapCursor(null);
