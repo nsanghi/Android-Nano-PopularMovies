@@ -10,7 +10,7 @@ import android.preference.PreferenceManager;
 public class Utility {
 
     public static final String API_KEY_CODE = "api_key";
-    public static final String API_KEY_VALUE = "0758a2d908b7f1295d294bd800b7b763";
+    public static final String API_KEY_VALUE = "<YOUR KEY>";
 
 
     public static String getPreferredSortBy(Context context) {
