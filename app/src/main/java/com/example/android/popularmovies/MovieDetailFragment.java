@@ -97,6 +97,17 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         mRuntime = (TextView) mRootView.findViewById(R.id.runtime);
         mButtom = (Button) mRootView.findViewById(R.id.favorite_button);
 
+
+        return mRootView;
+    }
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        //when movie data needs to come from db. Use cursorloader to load
+        //all three table data - movie, trailer, review, for a given
+        //movie row Id
+        mActivity = getActivity();
+
         Bundle args = getArguments();
         if (args!=null) {
             Uri uri = args.getParcelable(MovieDetailFragment.DETAIL_URI);
@@ -155,15 +166,6 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
             Log.d(LOG_TAG, "Started with null Arguments");
         }
 
-        return mRootView;
-    }
-
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        //when movie data needs to come from db. Use cursorloader to load
-        //all three table data - movie, trailer, review, for a given
-        //movie row Id
-        mActivity = getActivity();
         if (Utility.isFavoriteOption(getActivity())) {
             Log.d(LOG_TAG, "Calling Loader for Movie");
             getLoaderManager().initLoader(MOVIE_LOADER, null, this);

@@ -314,8 +314,10 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
 
         @Override
         protected void onPostExecute(List<Movie> movies) {
-            mMovieArrayAdapter.clear();
-            mMovieArrayAdapter.addAll(movies);
+            if (movies != null) {
+                mMovieArrayAdapter.clear();
+                mMovieArrayAdapter.addAll(movies);
+            }
         }
     }
 }
