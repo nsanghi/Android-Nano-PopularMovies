@@ -1,5 +1,5 @@
 Please obtain an API key by first signing up at https://www.themoviedb.org/account/signup
 and then requesting the API key.
 Once you obtain the API key, please put it inside
-the variable API_KEY_VALUE in the class com.example.android.popularmovies.Utility
+the variable API_KEY_VALUE in the class com.example.android.popularmovies.Constants
 

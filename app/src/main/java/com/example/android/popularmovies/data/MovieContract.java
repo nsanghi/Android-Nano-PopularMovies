@@ -40,6 +40,16 @@ public class MovieContract {
             return ContentUris.withAppendedId(CONTENT_URI, id);
         }
 
+        public static long getMovieIdFromUri(Uri uri) {
+            return Long.valueOf(uri.getPathSegments().get(1));
+        }
+
+        public static Uri buildMovieUriFromMovieCode(String movieCode) {
+            return MovieEntry.CONTENT_URI.buildUpon().appendPath(movieCode)
+                    .appendPath(COLUMN_MOVIE_CODE).build();
+        }
+
+
     }
 
     public static final class TrailerEntry implements BaseColumns {

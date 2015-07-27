@@ -18,6 +18,7 @@ public class MovieProvider extends ContentProvider {
 
     static final int MOVIE = 100;
     static final int MOVIE_WITH_ID = 200;
+    static final int MOVIE_WITH_MOVIE_CODE = 250;
     static final int TRAILER = 300;
     static final int TRAILER_WITH_MOVIE_ID = 400;
     static final int REVIEW = 500;
@@ -29,6 +30,10 @@ public class MovieProvider extends ContentProvider {
     private static final String sMovieSelection =
             MovieContract.MovieEntry.TABLE_NAME + "." +
                     MovieContract.MovieEntry._ID + " = ?";
+
+    private static final String sMovieSelectionMovieCode =
+            MovieContract.MovieEntry.TABLE_NAME + "." +
+                    MovieContract.MovieEntry.COLUMN_MOVIE_CODE + " = ?";
 
     private static final String sTrailerSelection =
             MovieContract.TrailerEntry.TABLE_NAME + "." +
@@ -47,6 +52,10 @@ public class MovieProvider extends ContentProvider {
         matcher.addURI(authority, MovieContract.PATH_MOVIE, MOVIE);
         // "movie/#"
         matcher.addURI(authority, MovieContract.PATH_MOVIE + "/#/", MOVIE_WITH_ID);
+        // "movie/*/movie_code"
+        matcher.addURI(authority, MovieContract.PATH_MOVIE + "/#/" + MovieContract.MovieEntry
+                        .COLUMN_MOVIE_CODE,
+                MOVIE_WITH_MOVIE_CODE);
         // "trailer"
         matcher.addURI(authority, MovieContract.PATH_TRAILER, TRAILER);
         // "movie/#/trailer"
@@ -74,6 +83,8 @@ public class MovieProvider extends ContentProvider {
             case MOVIE:
                 return MovieContract.MovieEntry.CONTENT_TYPE;
             case MOVIE_WITH_ID:
+                return MovieContract.MovieEntry.CONTENT_ITEM_TYPE;
+            case MOVIE_WITH_MOVIE_CODE:
                 return MovieContract.MovieEntry.CONTENT_ITEM_TYPE;
             case TRAILER:
                 return MovieContract.TrailerEntry.CONTENT_TYPE;
@@ -125,6 +136,25 @@ public class MovieProvider extends ContentProvider {
                 break;
             }
 
+            // "movie/*/movie_code"
+            case MOVIE_WITH_MOVIE_CODE: {
+                selectionArgs =
+                        new String[]{Long.toString(MovieContract.MovieEntry.getMovieIdFromUri
+                                (uri))};
+                Log.d(LOG_TAG, "Selection Args : " + Arrays.toString(selectionArgs));
+                Log.d(LOG_TAG, "sMovieSelectionMovieCode: " + sMovieSelectionMovieCode);
+
+                retCursor = mOpenHelper.getReadableDatabase().query(
+                        MovieContract.MovieEntry.TABLE_NAME,
+                        projection,
+                        sMovieSelectionMovieCode,
+                        selectionArgs,
+                        null,
+                        null,
+                        sortOrder
+                );
+                break;
+            }
             // "trailer"
             case TRAILER: {
                 retCursor = mOpenHelper.getReadableDatabase().query(
@@ -232,7 +262,7 @@ public class MovieProvider extends ContentProvider {
             default:
                 throw new UnsupportedOperationException("Unknown uri: " + uri);
         }
-        getContext().getContentResolver().notifyChange(uri, null);
+        //getContext().getContentResolver().notifyChange(uri, null);
         return returnUri;
     }
 
@@ -258,13 +288,54 @@ public class MovieProvider extends ContentProvider {
                 rowsDeleted =
                         db.delete(MovieContract.ReviewEntry.TABLE_NAME, selection, selectionArgs);
                 break;
+            // "movie/*/movie_code"
+            case MOVIE_WITH_MOVIE_CODE: {
+                selectionArgs =
+                        new String[]{Long.toString(MovieContract.MovieEntry.getMovieIdFromUri
+                                (uri))};
+                Log.d(LOG_TAG, "Selection Args : " + Arrays.toString(selectionArgs));
+                Log.d(LOG_TAG, "sMovieSelectionMovieCode: " + sMovieSelectionMovieCode);
+
+                rowsDeleted = db.delete(
+                        MovieContract.MovieEntry.TABLE_NAME,
+                        sMovieSelectionMovieCode,
+                        selectionArgs);
+                break;
+            }
+            // "movie/#/trailer"
+            case TRAILER_WITH_MOVIE_ID: {
+                selectionArgs =
+                        new String[]{Long.toString(MovieContract.TrailerEntry.getMovieIdFromUri
+                                (uri))};
+                Log.d(LOG_TAG, "Selection Args : " + Arrays.toString(selectionArgs));
+                Log.d(LOG_TAG, "sTrailerSelection: " + sTrailerSelection);
+
+                rowsDeleted = db.delete(
+                        MovieContract.TrailerEntry.TABLE_NAME,
+                        sTrailerSelection,
+                        selectionArgs);
+                break;
+            }
+            // "movie/#/review"
+            case REVIEW_WITH_MOVIE_ID: {
+                selectionArgs =
+                        new String[]{Long.toString(MovieContract.ReviewEntry.getMovieIdFromUri
+                                (uri))};
+                Log.d(LOG_TAG, "Selection Args : " + Arrays.toString(selectionArgs));
+                Log.d(LOG_TAG, "sReviewSelection: " + sReviewSelection);
+                rowsDeleted = db.delete(
+                        MovieContract.ReviewEntry.TABLE_NAME,
+                        sReviewSelection,
+                        selectionArgs);
+                break;
+            }
             default:
                 throw new UnsupportedOperationException("Unknown uri: " + uri);
         }
 
-        if (rowsDeleted != 0) {
-            getContext().getContentResolver().notifyChange(uri, null);
-        }
+//        if (rowsDeleted != 0) {
+//            getContext().getContentResolver().notifyChange(uri, null);
+//        }
         return  rowsDeleted;
     }
 

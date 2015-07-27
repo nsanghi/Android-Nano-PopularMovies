@@ -77,12 +77,11 @@
                             android:layout_height="wrap_content"
                             android:textSize="14sp" />
 
-                        <Button
+                        <ImageButton
                             android:id="@+id/favorite_button"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:background="@color/button_color"
-                            android:text="@string/mark_favorite" />
+                            android:src="@drawable/ic_star_border_black_48dp"/>
 
                     </LinearLayout>
 

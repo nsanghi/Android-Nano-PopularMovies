@@ -59,7 +59,7 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
+        //setHasOptionsMenu(true);
     }
 
     @Override
@@ -217,7 +217,7 @@ public class MoviesFragment extends Fragment implements LoaderManager.LoaderCall
             try {
                 Uri buildUri = Uri.parse(BASE_URL).buildUpon()
                         .appendQueryParameter(SORT_CODE, sortBy)
-                        .appendQueryParameter(Utility.API_KEY_CODE, Utility.API_KEY_VALUE)
+                        .appendQueryParameter(Constants.API_KEY_CODE, Constants.API_KEY_VALUE)
                         .build();
 
                 //create the request to movieDB api and open the connection

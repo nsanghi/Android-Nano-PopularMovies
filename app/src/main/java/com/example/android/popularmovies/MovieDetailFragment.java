@@ -4,7 +4,6 @@ package com.example.android.popularmovies;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentUris;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -23,7 +22,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -56,6 +55,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     public static final int MOVIE_LOADER = 0;
     public static final int TRAILER_LOADER = 1;
     public static final int REVIEW_LOADER = 2;
+    public static final int MOVIE_LOADER_CHECK_EXIST = 3;
 
     static final String DETAIL_URI = "URI";
 
@@ -66,7 +66,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     private TextView mOverview;
     private TextView mRuntime;
     private View mRootView;
-    private Button mButtom;
+    private ImageButton mButtom;
     private ArrayList<String> mTrailers;
     private ArrayList<Review> mReviews;
     private long movieRowId;
@@ -95,7 +95,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         mRating = (TextView) mRootView.findViewById(R.id.user_rating);
         mOverview = (TextView) mRootView.findViewById(R.id.overview);
         mRuntime = (TextView) mRootView.findViewById(R.id.runtime);
-        mButtom = (Button) mRootView.findViewById(R.id.favorite_button);
+        mButtom = (ImageButton) mRootView.findViewById(R.id.favorite_button);
 
 
         return mRootView;
@@ -109,7 +109,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         mActivity = getActivity();
 
         Bundle args = getArguments();
-        if (args!=null) {
+        if (args != null) {
             Uri uri = args.getParcelable(MovieDetailFragment.DETAIL_URI);
             Movie movie = args.getParcelable(MoviesFragment.EXTRA_MOVIE);
 
@@ -148,7 +148,14 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                         //persist the data in database when button is clicked.
                         //this button listener will be attached only when sort option is not
                         // "Favorite"
-                        saveFavoriteMovieData();
+                        //Process is first start a loader to retrieve a matching existing movie row
+                        // if present. Then pass this movierow to an AsyncTask which will delete
+                        // existing rows, followed by insert of new Rows
+                        mButtom.setClickable(false);
+                        Log.d(LOG_TAG, "Favorite button clicked");
+                        Log.d(LOG_TAG, "Calling Loader for Movie to check Existing");
+                        getLoaderManager().initLoader(MOVIE_LOADER_CHECK_EXIST, null,
+                                MovieDetailFragment.this);
                     }
                 });
             } else {
@@ -214,66 +221,20 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
     }
 
     private Intent createShareForecastIntent() {
-        if (mTrailers != null && mTrailers.size() >0) {
+        if (mTrailers != null && mTrailers.size() > 0) {
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
             shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, "http://www.youtube.com/watch?v=" + mTrailers.get(0));
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "http://www.youtube.com/watch?v=" + mTrailers
+                    .get(0));
 
             return shareIntent;
         }
         return null;
     }
 
-    private void saveFavoriteMovieData() {
 
-        Uri returnUri;
-
-        ContentValues movieValues = new ContentValues();
-        movieValues.put(MovieContract.MovieEntry.COLUMN_MOVIE_CODE, mMovieCode);
-        movieValues.put(MovieContract.MovieEntry.COLUMN_OVERVIEW, mOverview.getText().toString());
-        movieValues.put(MovieContract.MovieEntry.COLUMN_POSTER_PATH, mMovieImagePath);
-        movieValues.put(MovieContract.MovieEntry.COLUMN_RELEASE_DATE, mReleaseDate.getText()
-                .toString());
-        movieValues.put(MovieContract.MovieEntry.COLUMN_TITLE, mTitle.getText().toString());
-        movieValues.put(MovieContract.MovieEntry.COLUMN_RATING, mRating.getText().toString());
-        movieValues.put(MovieContract.MovieEntry.COLUMN_RUNTIME, mRuntime.getText().toString());
-        returnUri = getActivity().getContentResolver().insert(MovieContract.MovieEntry.CONTENT_URI,
-                movieValues);
-        Log.d(LOG_TAG, "insert into Movie returned with Uri: " + returnUri);
-        movieRowId = ContentUris.parseId(returnUri);
-
-        ContentValues values;
-        for (String youtubeUrl : mTrailers) {
-            values = new ContentValues();
-            values.put(MovieContract.TrailerEntry.COLUMN_YOUTUBE_URL, youtubeUrl);
-            values.put(MovieContract.TrailerEntry.COLUMN_MOVIE_ID, movieRowId);
-            returnUri = getActivity().getContentResolver().insert(MovieContract.TrailerEntry
-                            .CONTENT_URI,
-                    values);
-            Log.d(LOG_TAG, "insert into Trailer returned with Uri: " + returnUri);
-
-        }
-
-        for (Review review : mReviews) {
-            values = new ContentValues();
-            values.put(MovieContract.ReviewEntry.COLUMN_REVIEWER_NAME, review.getAutoher());
-            values.put(MovieContract.ReviewEntry.COLUMN_REVIEWER_COMMENT, review.getComment());
-            values.put(MovieContract.ReviewEntry.COLUMN_MOVIE_ID, movieRowId);
-            returnUri = getActivity().getContentResolver().insert(MovieContract.ReviewEntry
-                            .CONTENT_URI, values);
-            Log.d(LOG_TAG, "insert into Review returned with Uri: " + returnUri);
-
-        }
-        //update the button to make sure that same data is not saved again and visual clue to the
-        //user to tell that the request to save data has been processed
-        //though technically till now only the request to persist the data has just been handed
-        //over to ContentResolver
-        mButtom.setText(getString(R.string.marked_favorite));
-    }
-
-
-    //conveninece method to take a collection of trailer URLs (as stored in memeber variable) and
+    //convenience method to take a collection of trailer URLs (as stored in member variable) and
     // paint the UI with associated play action
     private void populateTrailers() {
         LinearLayout trailersLayout = (LinearLayout) mRootView.findViewById(R.id.trailer_list);
@@ -311,7 +272,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         }
     }
 
-    //conveninece method to take a collection of reviews (stored as memeber variable) and paint the
+    //convenience method to take a collection of reviews (stored as member variable) and paint the
     // UI with associated play action
     private void populateReviews() {
         LinearLayout reviewsLayout = (LinearLayout) mRootView.findViewById(R.id.review_list);
@@ -343,6 +304,19 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                         null
                 );
             }
+
+            case MOVIE_LOADER_CHECK_EXIST: {
+                Uri uri = MovieContract.MovieEntry.buildMovieUriFromMovieCode(mMovieCode);
+                return new CursorLoader(
+                        getActivity(),
+                        uri,
+                        null,
+                        null,
+                        null,
+                        null
+                );
+            }
+
             case REVIEW_LOADER: {
                 Uri uri = MovieContract.ReviewEntry.buildReviewMovie(movieRowId);
                 return new CursorLoader(
@@ -394,9 +368,36 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                             .COLUMN_MOVIE_CODE));
                     mMovieImagePath = data.getString(data.getColumnIndex(MovieContract.MovieEntry
                             .COLUMN_POSTER_PATH));
-                    mButtom.setText(getString(R.string.marked_favorite));
+                    mButtom.setImageResource(R.drawable.ic_star_black_48dp);
+                    mButtom.setClickable(false);
                 }
                 break;
+            }
+
+            //once the status of current matching movie in database is selected, start AsyncProcess
+            // to delete and insert new data
+            case MOVIE_LOADER_CHECK_EXIST: {
+                long existingMovieRowId = -1L;
+                if (data != null && data.getCount() > 0) {
+                    data.moveToFirst();
+                    existingMovieRowId = data.getLong(data.getColumnIndex(MovieContract
+                            .MovieEntry._ID));
+                }
+
+                Log.d(LOG_TAG, "Calling AsyncTask to save data");
+                SaveFavoriteTask task = new SaveFavoriteTask(
+                        getActivity(),
+                        existingMovieRowId,
+                        mMovieCode,
+                        mOverview.getText().toString(),
+                        mMovieImagePath, mReleaseDate.getText().toString(),
+                        mTitle.getText().toString(),
+                        mRating.getText().toString(),
+                        mRuntime.getText().toString(),
+                        new ArrayList<String>(mTrailers),
+                        new ArrayList<Review>(mReviews), mButtom
+                );
+                task.execute();
             }
             case TRAILER_LOADER: {
                 if (data != null) {
@@ -453,7 +454,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
             try {
                 Uri buildUri = Uri.parse(BASE_URL).buildUpon()
                         .appendPath(params[0])
-                        .appendQueryParameter(Utility.API_KEY_CODE, Utility.API_KEY_VALUE)
+                        .appendQueryParameter(Constants.API_KEY_CODE, Constants.API_KEY_VALUE)
                         .build();
 
                 URL url = new URL(buildUri.toString());
@@ -521,7 +522,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                 Uri buildUri = Uri.parse(BASE_URL).buildUpon()
                         .appendPath(params[0])
                         .appendPath(MDB_TRAILER_PATH)
-                        .appendQueryParameter(Utility.API_KEY_CODE, Utility.API_KEY_VALUE)
+                        .appendQueryParameter(Constants.API_KEY_CODE, Constants.API_KEY_VALUE)
                         .build();
 
                 URL url = new URL(buildUri.toString());
@@ -603,7 +604,7 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
                 Uri buildUri = Uri.parse(BASE_URL).buildUpon()
                         .appendPath(params[0])
                         .appendPath(MDB_REVIEW_PATH)
-                        .appendQueryParameter(Utility.API_KEY_CODE, Utility.API_KEY_VALUE)
+                        .appendQueryParameter(Constants.API_KEY_CODE, Constants.API_KEY_VALUE)
                         .build();
 
                 URL url = new URL(buildUri.toString());
@@ -662,6 +663,5 @@ public class MovieDetailFragment extends Fragment implements LoaderManager
         }
 
     }
-
 
 }
